@@ -136,6 +136,53 @@ export function PlannerProvider({ children }) {
     root.style.setProperty('--text-main', hexToRgbChannels(state.colors.text || '#FFFFFF', '255 255 255'));
   }, [state.colors]);
 
+  // 1. Prevent Accidental Exit / Close / Refresh
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      // Prompt user if they are currently filling out steps (step 1 to 16)
+      if (currentStep > 0 && currentStep < 16) {
+        e.preventDefault();
+        e.returnValue = 'Are you sure you want to leave? Your design brief choices may not be saved.';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [currentStep]);
+
+  // 2. Browser Back Button Navigation (Prevents leaving site on Back button press)
+  useEffect(() => {
+    // Set initial state
+    try {
+      window.history.replaceState({ step: currentStep }, '');
+    } catch (e) {
+      // ignore
+    }
+
+    const handlePopState = (e) => {
+      if (e.state && typeof e.state.step === 'number') {
+        setCurrentStep(e.state.step);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        setCurrentStep((prev) => {
+          if (prev > 0) {
+            const prevVal = prev - 1;
+            try {
+              window.history.pushState({ step: prevVal }, '');
+            } catch (err) {}
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return prevVal;
+          }
+          return 0;
+        });
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const showToast = (message, type = 'info') => {
     setToastMessage({ message, type, id: Date.now() });
   };
@@ -358,26 +405,31 @@ export function PlannerProvider({ children }) {
     return true;
   };
 
+  const updateStepWithHistory = (targetStep) => {
+    try {
+      window.history.pushState({ step: targetStep }, '');
+    } catch (e) {}
+    setCurrentStep(targetStep);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const nextStep = () => {
     if (!validateCurrentStep()) return;
     if (currentStep < 16) {
-      setCurrentStep(prev => prev + 1);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      updateStepWithHistory(currentStep + 1);
     }
   };
 
   const prevStep = () => {
     if (currentStep > 0) {
-      setCurrentStep(prev => prev - 1);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      updateStepWithHistory(currentStep - 1);
     }
   };
 
   const goToStep = (step) => {
     if (step > currentStep && !validateCurrentStep()) return;
     if (step >= 0 && step <= 16) {
-      setCurrentStep(step);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      updateStepWithHistory(step);
     }
   };
 
