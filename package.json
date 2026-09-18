@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "chmod +x ./node_modules/.bin/* 2>/dev/null || true; npx vite build",
-    "preview": "vite preview"
+    "build": "vite build",
+    "preview": "vite preview",
+    "postinstall": "chmod +x ./node_modules/.bin/* 2>/dev/null || true"
   },
   "dependencies": {
     "@react-pdf/renderer": "^3.4.4",
