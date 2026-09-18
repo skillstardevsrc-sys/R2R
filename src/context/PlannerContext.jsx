@@ -105,18 +105,35 @@ export function PlannerProvider({ children }) {
     }
   }, [state]);
 
+  // Helper to convert hex (#D4AF37) to RGB channels ('212 175 55')
+  const hexToRgbChannels = (hexStr, defaultRgb = '212 175 55') => {
+    if (!hexStr || typeof hexStr !== 'string') return defaultRgb;
+    let hex = hexStr.replace('#', '').trim();
+    if (hex.length === 3) {
+      hex = hex.split('').map(c => c + c).join('');
+    }
+    if (hex.length !== 6) return defaultRgb;
+    const num = parseInt(hex, 16);
+    if (isNaN(num)) return defaultRgb;
+    const r = (num >> 16) & 255;
+    const g = (num >> 8) & 255;
+    const b = num & 255;
+    return `${r} ${g} ${b}`;
+  };
+
   // Apply dynamic CSS variables for theme and colors
   useEffect(() => {
     const root = document.documentElement;
-    const accent = state.colors.accent || '#D4AF37';
-    const bg = state.colors.background || '#080808';
-    const surface = state.colors.secondary || '#171717';
+    const accentHex = state.colors.accent || '#D4AF37';
+    const bgHex = state.colors.background || '#080808';
+    const surfaceHex = state.colors.secondary || '#171717';
 
-    root.style.setProperty('--accent', accent);
-    root.style.setProperty('--accent-soft', `${accent}25`);
-    root.style.setProperty('--accent-glow', `${accent}66`);
-    root.style.setProperty('--bg', bg);
-    root.style.setProperty('--surface', surface);
+    root.style.setProperty('--accent', hexToRgbChannels(accentHex, '212 175 55'));
+    root.style.setProperty('--accent-soft', `${accentHex}25`);
+    root.style.setProperty('--accent-glow', `${accentHex}66`);
+    root.style.setProperty('--bg', hexToRgbChannels(bgHex, '8 8 8'));
+    root.style.setProperty('--surface', hexToRgbChannels(surfaceHex, '23 23 23'));
+    root.style.setProperty('--text-main', hexToRgbChannels(state.colors.text || '#FFFFFF', '255 255 255'));
   }, [state.colors]);
 
   const showToast = (message, type = 'info') => {
