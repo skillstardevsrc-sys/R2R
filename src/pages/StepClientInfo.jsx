@@ -70,7 +70,7 @@ export default function StepClientInfo() {
           <TextField
             id="whatsapp"
             label="WhatsApp Number"
-            placeholder="e.g. 7558238968 or +91 95855 75354"
+            placeholder="e.g. +91 75581 38968 or +91 95855 75354"
             icon={Phone}
             value={client.whatsapp || ''}
             onChange={(e) => handleChange('whatsapp', e.target.value)}

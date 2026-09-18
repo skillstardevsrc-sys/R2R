@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Check } from 'lucide-react';
+import { Check, ArrowRight } from 'lucide-react';
+import { usePlanner } from '../../context/PlannerContext';
 import Badge from './Badge';
 
 export default function OptionCard({
@@ -10,12 +11,22 @@ export default function OptionCard({
   description,
   isSelected = false,
   onClick,
+  onContinue,
+  showContinueBtn = true,
   badge,
   children,
   icon: Icon,
   className = '',
   previewContent = null
 }) {
+  let nextStep;
+  try {
+    const planner = usePlanner();
+    nextStep = planner?.nextStep;
+  } catch (e) {
+    // optional outside planner context
+  }
+
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -95,6 +106,34 @@ export default function OptionCard({
         <div className="mt-3 w-full">
           {children}
         </div>
+      )}
+
+      {/* Inline Continue Button on Selection */}
+      {isSelected && showContinueBtn && (
+        <motion.div
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-4 pt-3 border-t border-accent/25 flex items-center justify-between w-full"
+        >
+          <span className="text-[11px] text-accent font-semibold flex items-center gap-1">
+            <Check className="w-3.5 h-3.5 stroke-[3]" /> Selected
+          </span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onContinue) {
+                onContinue();
+              } else if (nextStep) {
+                nextStep();
+              }
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-black text-xs font-bold hover:bg-amber-400 transition-all shadow-md active:scale-95 cursor-pointer"
+          >
+            <span>Continue</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </motion.div>
       )}
     </motion.div>
   );

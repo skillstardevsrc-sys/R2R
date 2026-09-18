@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, Send, Download, CheckCircle2, AlertCircle, Copy, Phone, UserCheck } from 'lucide-react';
+import { MessageSquare, Send, Download, CheckCircle2, AlertCircle, Copy, Phone, UserCheck, Loader2, Share2 } from 'lucide-react';
+import { pdf } from '@react-pdf/renderer';
 import { formatWhatsAppMessage, generateWhatsAppLink } from '../../utils/whatsapp';
+import DesignBriefPDF from '../pdf/DesignBriefPDF';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import PDFDownloadBtn from '../pdf/PDFDownloadBtn';
 import TextField from '../ui/TextField';
+import { sanitizeFilename } from '../../utils/sanitize';
 
 const QUICK_NUMBERS = [
-  { label: 'Primary Contact 1', number: '+91 75582 38968', raw: '7558238968' },
+  { label: 'Primary Contact 1', number: '+91 75581 38968', raw: '+917558138968' },
   { label: 'Primary Contact 2', number: '+91 95855 75354', raw: '+919585575354' }
 ];
 
@@ -15,8 +18,8 @@ export default function WhatsAppModal({ isOpen, onClose, state }) {
   const clientPhone = state.client?.whatsapp || '';
   const [selectedPhone, setSelectedPhone] = useState(clientPhone || QUICK_NUMBERS[0].raw);
   const [copied, setCopied] = useState(false);
-  const [isSendingCloud, setIsSendingCloud] = useState(false);
-  const [cloudStatus, setCloudStatus] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [downloadedNotice, setDownloadedNotice] = useState(false);
 
   useEffect(() => {
     if (clientPhone) {
@@ -35,27 +38,80 @@ export default function WhatsAppModal({ isOpen, onClose, state }) {
     setTimeout(() => setCopied(false), 2500);
   };
 
-  const handleOpenWhatsApp = () => {
-    window.open(waLink, '_blank', 'noopener,noreferrer');
+  // Smart Send: Generates PDF + Text, attempts direct File Share or Auto-downloads PDF & opens WhatsApp
+  const handleSmartSend = async () => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+    setDownloadedNotice(false);
+
+    try {
+      // 1. Generate Single-Page Light PDF Blob
+      const doc = <DesignBriefPDF state={state} />;
+      const asPdf = pdf();
+      asPdf.updateContainer(doc);
+      const blob = await asPdf.toBlob();
+      
+      const brandBase = sanitizeFilename(state.client?.brandName || 'Website');
+      const filename = `${brandBase}-Design-Brief.pdf`;
+      const pdfFile = new File([blob], filename, { type: 'application/pdf' });
+
+      // 2. Mobile/Supported Browser Web Share API (File + Message attached directly)
+      if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+        await navigator.share({
+          title: `${state.client?.brandName || 'Brand'} - Website Design Brief`,
+          text: message,
+          files: [pdfFile]
+        });
+        setIsProcessing(false);
+        return;
+      }
+
+      // 3. Desktop / Fallback: Auto-download PDF & open WhatsApp Web link
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setDownloadedNotice(true);
+
+      // Open WhatsApp chat
+      window.open(waLink, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      console.warn('Share or PDF generation fallback:', err);
+      window.open(waLink, '_blank', 'noopener,noreferrer');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Dispatch Design Brief on WhatsApp"
-      subtitle="Send formatted brief directly via WhatsApp Web / App"
+      title="Dispatch Design Brief & PDF on WhatsApp"
+      subtitle="Send formatted text + auto-attached single page PDF brief"
       maxWidth="max-w-2xl"
     >
       <div className="flex flex-col gap-5">
-        {/* Notice */}
-        <div className="bg-surface p-4 rounded-xl border border-white/10 flex items-start gap-3">
+        {/* Helper Notice */}
+        <div className="bg-emerald-950/40 p-4 rounded-xl border border-emerald-500/30 flex items-start gap-3">
           <MessageSquare className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
           <div className="text-xs text-text-muted leading-relaxed">
-            <span className="text-white font-semibold block mb-0.5">WhatsApp Web / Mobile Workflow</span>
-            First download the generated PDF brief, then click <strong className="text-white">Open WhatsApp</strong> to send the summary message along with your attached PDF.
+            <span className="text-emerald-300 font-bold block mb-0.5">Automated PDF & Text Dispatch</span>
+            Clicking <strong className="text-white">Send PDF & Message on WhatsApp</strong> automatically compiles your single-page PDF brief, initiates download/share, and opens WhatsApp pre-filled with full project specs.
           </div>
         </div>
+
+        {downloadedNotice && (
+          <div className="p-3 bg-amber-950/60 border border-amber-500/40 rounded-xl text-xs text-amber-300 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>PDF Brief downloaded to your device! Simply attach it in the opened WhatsApp window.</span>
+          </div>
+        )}
 
         {/* Select Target WhatsApp Number */}
         <div className="flex flex-col gap-2 bg-white/5 p-4 rounded-xl border border-white/10">
@@ -109,7 +165,7 @@ export default function WhatsAppModal({ isOpen, onClose, state }) {
             <TextField
               id="custom-whatsapp-input"
               label="Or enter custom number:"
-              placeholder="e.g. 7558238968 or +91 95855 75354"
+              placeholder="e.g. +91 75581 38968 or +91 95855 75354"
               value={selectedPhone}
               onChange={(e) => setSelectedPhone(e.target.value)}
             />
@@ -120,7 +176,7 @@ export default function WhatsAppModal({ isOpen, onClose, state }) {
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-xs font-semibold uppercase tracking-wider text-text-muted">
-              Prepared WhatsApp Message
+              Prepared WhatsApp Message Summary
             </label>
             <button
               type="button"
@@ -152,17 +208,18 @@ export default function WhatsAppModal({ isOpen, onClose, state }) {
             state={state}
             variant="outline"
             size="md"
-            className="w-full sm:w-1/2"
+            className="w-full sm:w-1/3"
           />
 
           <Button
             variant="primary"
             size="md"
-            icon={Send}
-            onClick={handleOpenWhatsApp}
-            className="w-full sm:w-1/2 bg-emerald-500 hover:bg-emerald-400 text-black font-bold shadow-lg"
+            icon={isProcessing ? Loader2 : Send}
+            disabled={isProcessing}
+            onClick={handleSmartSend}
+            className="w-full sm:w-2/3 bg-emerald-500 hover:bg-emerald-400 text-black font-bold shadow-lg"
           >
-            Open WhatsApp ({selectedPhone || 'Select Number'})
+            {isProcessing ? 'Preparing PDF & Opening...' : `Send PDF & Message on WhatsApp`}
           </Button>
         </div>
       </div>
